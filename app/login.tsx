@@ -1,5 +1,5 @@
 import { useAuth } from "@/contexts/AuthContext";
-import { LinearGradient } from "expo-linear-gradient"; // Import the gradient component
+import { LinearGradient } from "expo-linear-gradient";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import {

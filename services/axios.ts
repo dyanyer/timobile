@@ -5,7 +5,7 @@ import * as SecureStore from "expo-secure-store";
 axios.defaults.withCredentials = true;
 
 export const DOMAIN =
-  process.env.EXPO_PUBLIC_API_URL || "https://jdgi.timora.ph";
+  process.env.EXPO_PUBLIC_API_URL || "https://bluelight.timora.ph";
 console.log(`API Domain: ${DOMAIN}`);
 
 const axiosClient = axios.create({
