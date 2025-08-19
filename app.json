@@ -9,7 +9,11 @@
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "infoPlist": {
+        "NSCameraUsageDescription": "We need access to your camera to take a photo.",
+        "NSLocationWhenInUseUsageDescription": "We need access to your location for clock-in."
+      }
     },
     "android": {
       "adaptiveIcon": {

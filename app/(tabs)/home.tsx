@@ -1,285 +1,273 @@
+import ClockInButton from "@/components/buttons/clockIn";
+import ClockOutButton from "@/components/buttons/clockOut";
+import MainBackgroundGradient from "@/components/gradients/mainBackground";
+import axiosClient from "@/services/axios";
 import { Ionicons } from "@expo/vector-icons";
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import {
   Animated,
   Dimensions,
+  Image,
+  RefreshControl,
+  SafeAreaView,
   ScrollView,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 
 const { width } = Dimensions.get("window");
 
 export default function Home() {
-  const [isMounted, setIsMounted] = useState(false);
   const [isClockIn, setIsClockIn] = useState(false);
-  const [currentTime, setCurrentTime] = useState(new Date());
-  const scaleAnim = new Animated.Value(1);
+  const [clockInTime, setClockInTime] = useState<string | null>(null);
+  const [clockInDate, setClockInDate] = useState<string | null>(null);
+  const [shiftId, setShiftId] = useState<number | null>(null);
+  const [refreshing, setRefreshing] = useState(false); // ✅ for pull-to-refresh
 
-  useEffect(() => {
-    setIsMounted(true);
+  // Add new state
+  const [clockOutTime, setClockOutTime] = useState<string | null>(null);
+  const [shiftCompleted, setShiftCompleted] = useState(false);
 
-    // Update time every second
-    const timer = setInterval(() => {
-      setCurrentTime(new Date());
-    }, 1000);
+  // formatters
+  const formatTime = (time: Date) => {
+    const hours = time.getHours().toString().padStart(2, "0");
+    const minutes = time.getMinutes().toString().padStart(2, "0");
+    return `${hours}:${minutes}`;
+  };
 
-    return () => {
-      setIsMounted(false);
-      clearInterval(timer);
-    };
+  const formatDate = (time: Date) => {
+    const day = time.getDate().toString().padStart(2, "0");
+    const month = (time.getMonth() + 1).toString().padStart(2, "0");
+    const year = time.getFullYear();
+    return `${month}/${day}/${year}`;
+  };
+
+  // ✅ extract fetch function
+  const fetchAttendanceStatus = useCallback(async () => {
+    try {
+      const res = await axiosClient.get("/attendance-employee");
+      const latest = res.data.latest;
+
+      // inside fetchAttendanceStatus
+      if (latest) {
+        if (latest.date_time_in && !latest.date_time_out) {
+          // user is clocked in
+          setIsClockIn(true);
+          setShiftCompleted(false);
+          setClockInTime(
+            new Date(latest.date_time_in).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+          );
+          setClockInDate(new Date(latest.date_time_in).toLocaleDateString());
+          setShiftId(latest.shift_id ?? null);
+          setClockOutTime(null);
+        } else if (latest.date_time_in && latest.date_time_out) {
+          // shift completed
+          setIsClockIn(false);
+          setShiftCompleted(true);
+          setClockInTime(
+            new Date(latest.date_time_in).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+          );
+          setClockInDate(new Date(latest.date_time_in).toLocaleDateString());
+          setClockOutTime(
+            new Date(latest.date_time_out).toLocaleTimeString([], {
+              hour: "2-digit",
+              minute: "2-digit",
+            })
+          );
+          setShiftId(latest.shift_id ?? null);
+        } else {
+          // no attendance today
+          setIsClockIn(false);
+          setShiftCompleted(false);
+          setClockInTime(null);
+          setClockInDate(null);
+          setClockOutTime(null);
+          setShiftId(null);
+        }
+      }
+
+      if (latest && latest.date_time_in && !latest.date_time_out) {
+        setIsClockIn(true);
+        setClockInTime(
+          new Date(latest.date_time_in).toLocaleTimeString([], {
+            hour: "2-digit",
+            minute: "2-digit",
+          })
+        );
+        setClockInDate(new Date(latest.date_time_in).toLocaleDateString());
+        setShiftId(latest.shift_id ?? null);
+      } else {
+        setIsClockIn(false);
+        setClockInTime(null);
+        setClockInDate(null);
+        setShiftId(null);
+      }
+    } catch (err) {
+      console.error("Error fetching attendance:", err);
+    }
   }, []);
 
+  // ✅ initial load
+  useEffect(() => {
+    fetchAttendanceStatus();
+  }, [fetchAttendanceStatus]);
+
+  // ✅ handle pull-to-refresh
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchAttendanceStatus();
+    setRefreshing(false);
+  };
+
   const quickActions = [
-    {
-      label: "Payslip",
-      icon: "cash-outline",
-      bgColor: "bg-[#085D6C]",
-      shadowColor: "shadow-[#085D6C]/30",
-    },
-    {
-      label: "Calendar",
-      icon: "calendar-outline",
-      bgColor: "bg-[#0A6D7F]",
-      shadowColor: "shadow-[#0A6D7F]/30",
-    },
-    {
-      label: "Shift",
-      icon: "time-outline",
-      bgColor: "bg-[#0C7E91]",
-      shadowColor: "shadow-[#0C7E91]/30",
-    },
-    {
-      label: "Overtime",
-      icon: "alarm-outline",
-      bgColor: "bg-[#0F8EA4]",
-      shadowColor: "shadow-[#0F8EA4]/30",
-    },
-    {
-      label: "Leave",
-      icon: "airplane-outline",
-      bgColor: "bg-[#1A9FB8]",
-      shadowColor: "shadow-[#1A9FB8]/30",
-    },
-    {
-      label: "Attendance",
-      icon: "checkmark-done-outline",
-      bgColor: "bg-[#085D6C]",
-      shadowColor: "shadow-[#085D6C]/30",
-    },
-    {
-      label: "Holiday",
-      icon: "calendar-clear-outline",
-      bgColor: "bg-[#0A6D7F]",
-      shadowColor: "shadow-[#0A6D7F]/30",
-    },
-    {
-      label: "Assets",
-      icon: "cube-outline",
-      bgColor: "bg-[#0C7E91]",
-      shadowColor: "shadow-[#0C7E91]/30",
-    },
+    { label: "Payslip", icon: "cash-outline", color: "#085D6C" },
+    { label: "Calendar", icon: "calendar-outline", color: "#085D6C" },
+    { label: "Shift", icon: "time-outline", color: "#085D6C" },
+    { label: "Overtime", icon: "alarm-outline", color: "#085D6C" },
+    { label: "Leave", icon: "airplane-outline", color: "#085D6C" },
+    { label: "Attendance", icon: "checkmark-done-outline", color: "#085D6C" },
+    { label: "Holiday", icon: "calendar-clear-outline", color: "#085D6C" },
+    { label: "Assets", icon: "cube-outline", color: "#085D6C" },
   ];
 
-  const handleActionPress = (item: any) => {
-    Animated.sequence([
-      Animated.timing(scaleAnim, {
-        toValue: 0.95,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-      Animated.timing(scaleAnim, {
-        toValue: 1,
-        duration: 100,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  };
-
-  const handleClockInOut = () => {
-    setIsClockIn(!isClockIn);
-  };
-
-  const formatTime = (date: Date) => {
-    return date.toLocaleTimeString("en-US", {
-      hour: "2-digit",
-      minute: "2-digit",
-      hour12: false,
-    });
-  };
-
-  if (!isMounted) return null;
-
   return (
-    <SafeAreaView className="flex-1 bg-[#06282e] p-2">
-      <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
-        <View className="p-8 m-6 rounded-xl bg-[#21a1a1] p">
-          <Text>Uer Name</Text>
-        </View>
-        {/* Enhanced Quick Actions Grid */}
-        <View className="px-6 mb-8">
-          <View className="bg-white rounded-2xl p-5 shadow-sm">
-            <View className="flex-row flex-wrap justify-between">
-              {quickActions.map((item, idx) => (
-                <TouchableOpacity
-                  key={idx}
-                  onPress={() => handleActionPress(item)}
-                  className="items-center mb-5"
-                  style={{ width: (width - 88) / 4 - 12 }}
-                  activeOpacity={0.7}
-                >
-                  <Animated.View
-                    className={`${item.bgColor} w-16 h-16 rounded-2xl items-center justify-center mb-3 shadow-lg ${item.shadowColor}`}
-                    style={{ transform: [{ scale: scaleAnim }] }}
-                  >
-                    <Ionicons
-                      name={item.icon as keyof typeof Ionicons.glyphMap}
-                      size={32}
-                      color="white"
-                    />
-                  </Animated.View>
-                  <Text className="text-xs text-center text-[#053E46] font-semibold leading-4">
-                    {item.label}
-                  </Text>
-                </TouchableOpacity>
-              ))}
+    <SafeAreaView className="h-full flex-1 bg-[#053E46] items-center justify-evenly">
+      <MainBackgroundGradient />
+      <ScrollView
+        className="flex-1"
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        } // ✅ pull-to-refresh
+      >
+        {/* Greeting Header */}
+        <View className="p-8">
+          <View className="bg-white blur-sm p-4 rounded-lg flex-row items-center justify-between">
+            <View className="bg-[#053E46] w-16 h-16 rounded-lg overflow-hidden">
+              <Image
+                source={{
+                  uri: "https://jafdigital.co/wp-content/uploads/2025/07/timora-logo-w.webp",
+                }}
+                style={{ width: "100%", height: "100%", resizeMode: "cover" }}
+              />
             </View>
+            <Text className="text-3xl font-extrabold text-[#053E46] ml-4">
+              Hello, User 👋
+            </Text>
           </View>
         </View>
 
-        {/* Enhanced Attendance Section */}
-        <View className="px-6 mb-8">
-          <Text className="text-2xl font-bold text-[#053E46] mb-5">
-            Attendance
-          </Text>
+        {/* Quick Actions Grid */}
+        <View className="p-6">
+          <View className="flex-row flex-wrap justify-between">
+            {quickActions.map((item, idx) => (
+              <TouchableOpacity
+                key={idx}
+                className="items-center mb-6"
+                style={{ width: (width - 48) / 4, paddingHorizontal: 6 }}
+                activeOpacity={0.8}
+              >
+                <Animated.View
+                  className="w-16 h-16 rounded-2xl items-center justify-center mb-2"
+                  style={{ backgroundColor: item.color }}
+                >
+                  <Ionicons
+                    name={item.icon as keyof typeof Ionicons.glyphMap}
+                    size={24}
+                    color="white"
+                  />
+                </Animated.View>
+                <Text className="text-xs text-center text-white font-semibold mt-2">
+                  {item.label}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        </View>
 
-          {/* Status Indicator */}
-          <View className="bg-white p-5 rounded-2xl shadow-sm mb-4">
+        {/* Attendance Section */}
+        <View className="px-6 mt-10">
+          <Text className="text-xl font-bold text-white mb-5">Attendance</Text>
+          <View className="bg-white p-5 rounded-3xl shadow-lg">
             <View className="flex-row items-center mb-4">
               <View
                 className={`w-3 h-3 rounded-full mr-2 ${
-                  isClockIn ? "bg-green-500" : "bg-red-500"
+                  isClockIn
+                    ? "bg-green-500"
+                    : shiftCompleted
+                    ? "bg-blue-500"
+                    : "bg-red-500"
                 }`}
               />
               <Text className="text-base font-semibold text-[#053E46]">
-                {isClockIn ? "Currently Clocked In" : "Currently Clocked Out"}
+                {isClockIn
+                  ? "Currently Clocked In"
+                  : shiftCompleted
+                  ? "Shift Completed"
+                  : "Currently Clocked Out"}
               </Text>
             </View>
 
             <View className="flex-row justify-between items-center">
               <View className="flex-1">
-                <View className="flex-row items-center mb-1">
-                  <Ionicons name="time-outline" size={16} color="#6B7280" />
-                  <Text className="text-gray-500 text-sm ml-1 font-medium">
-                    Clock In
-                  </Text>
-                </View>
-                <Text className="text-3xl font-extrabold text-[#053E46]">
-                  {isClockIn ? "09:00" : "--:--"}
+                <Text className="text-gray-500 text-sm mb-1">Clock In</Text>
+                <Text className="text-2xl font-extrabold text-[#085D6C]">
+                  {clockInTime ?? "--:--"}
                 </Text>
               </View>
-
               <View className="flex-1 items-end">
-                <View className="flex-row items-center mb-1">
-                  <Ionicons name="exit-outline" size={16} color="#6B7280" />
-                  <Text className="text-gray-500 text-sm ml-1 font-medium">
-                    Clock Out
-                  </Text>
-                </View>
-                <Text className="text-3xl font-extrabold text-[#053E46]">
-                  {isClockIn ? formatTime(currentTime) : "--:--"}
+                <Text className="text-gray-500 text-sm mb-1">Clock Out</Text>
+                <Text className="text-2xl font-extrabold text-[#0A6D7F]">
+                  {clockOutTime ?? "--:--"}
                 </Text>
               </View>
             </View>
+
+            {clockInDate && (
+              <View className="mt-4">
+                <Text className="text-sm text-center text-[#053E46]">
+                  {shiftCompleted
+                    ? `Shift completed on: ${clockInDate}`
+                    : `Clocked in on: ${clockInDate}`}
+                </Text>
+              </View>
+            )}
           </View>
 
-          {/* Enhanced Clock In/Out Button */}
-          <TouchableOpacity
-            onPress={handleClockInOut}
-            className={`py-4 rounded-2xl shadow-lg active:scale-95 ${
-              isClockIn
-                ? "bg-[#0A6D7F] shadow-[#0A6D7F]/30"
-                : "bg-[#085D6C] shadow-[#085D6C]/30"
-            }`}
-            activeOpacity={0.8}
-          >
-            <View className="flex-row items-center justify-center">
-              <Ionicons
-                name={isClockIn ? "exit-outline" : "enter-outline"}
-                size={24}
-                color="white"
-                style={{ marginRight: 8 }}
-              />
-              <Text className="text-center text-white font-bold text-lg">
-                {isClockIn ? "Clock Out" : "Clock In"}
-              </Text>
-            </View>
-          </TouchableOpacity>
-        </View>
-
-        {/* Enhanced Announcements Section */}
-        <View className="px-6 mb-8">
-          <View className="flex-row justify-between items-center mb-5">
-            <Text className="text-2xl font-bold text-[#053E46]">
-              Announcements
-            </Text>
-            <TouchableOpacity>
-              <Text className="text-[#085D6C] text-sm font-semibold">
-                View All
-              </Text>
-            </TouchableOpacity>
-          </View>
-
-          <View className="bg-white p-5 rounded-2xl shadow-sm mb-4">
-            <View className="flex-row items-start">
-              <View className="bg-blue-50 p-2 rounded-xl mr-3">
-                <Ionicons
-                  name="information-circle-outline"
-                  size={24}
-                  color="#085D6C"
-                />
-              </View>
-              <View className="flex-1">
-                <Text className="text-[#053E46] font-bold text-base mb-1.5">
-                  Update your personal details
-                </Text>
-                <Text className="text-gray-500 text-sm leading-5 mb-2">
-                  Please make sure your contact details are up to date in the
-                  system.
-                </Text>
-                <TouchableOpacity>
-                  <Text className="text-[#085D6C] text-sm font-semibold">
-                    Update Now →
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
-
-          {/* Additional Announcement */}
-          <View className="bg-white p-5 rounded-2xl shadow-sm">
-            <View className="flex-row items-start">
-              <View className="bg-teal-50 p-2 rounded-xl mr-3">
-                <Ionicons name="calendar-outline" size={24} color="#0A6D7F" />
-              </View>
-              <View className="flex-1">
-                <Text className="text-[#053E46] font-bold text-base mb-1.5">
-                  Holiday Schedule Updated
-                </Text>
-                <Text className="text-gray-500 text-sm leading-5 mb-2">
-                  New holiday schedule for Q2 2025 has been published. Check
-                  your calendar.
-                </Text>
-                <TouchableOpacity>
-                  <Text className="text-[#085D6C] text-sm font-semibold">
-                    View Schedule →
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          </View>
+          {/* Clock In/Out Button */}
+          {/* Clock In/Out Button */}
+          {!isClockIn && !shiftCompleted ? (
+            <ClockInButton
+              isClockIn={isClockIn}
+              onClockInChange={(status: boolean) => {
+                if (status) {
+                  const currentTime = new Date();
+                  setClockInTime(formatTime(currentTime));
+                  setClockInDate(formatDate(currentTime));
+                } else {
+                  setClockInTime(null);
+                  setClockInDate(null);
+                }
+                setIsClockIn(status);
+              }}
+            />
+          ) : isClockIn ? (
+            <ClockOutButton
+              shiftId={shiftId ?? 1}
+              onClockOutSuccess={(time: string) => {
+                setIsClockIn(false);
+                setShiftCompleted(true);
+                setClockOutTime(time);
+              }}
+            />
+          ) : null}
         </View>
       </ScrollView>
     </SafeAreaView>
